@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="so">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Waafi Loan Calculator</title>
+
+    <!-- ✅ Telegram SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <style>
+        body {
+            font-family: -apple-system, sans-serif;
+            background-color: #f1f3f5;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .app-header {
+            width: 100%;
+            background: linear-gradient(to bottom, #82d13d, #a3e635);
+            padding: 20px 20px 40px;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            box-sizing: border-box;
+        }
+
+        .card {
+            background: white;
+            width: 92%;
+            max-width: 450px;
+            margin-top: -25px;
+            padding: 30px 20px;
+            border-radius: 15px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+            box-sizing: border-box;
+        }
+
+        h2 {
+            font-size: 22px;
+            color: #333;
+            margin: 0 0 5px;
+            text-align: center;
+        }
+
+        .subtext {
+            font-size: 11px;
+            color: #888;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .slider-section { margin-bottom: 25px; }
+
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            font-weight: 500;
+            font-size: 14px;
+            color: #444;
+        }
+
+        .green-text { color: #82d13d; font-weight: bold; }
+
+        input[type=range] {
+            width: 100%;
+            accent-color: #82d13d;
+            margin: 15px 0;
+            height: 6px;
+        }
+
+        .slider-footer {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #bbb;
+        }
+
+        .result-container {
+            background: #fafafa;
+            border: 1px solid #f0f0f0;
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+            margin: 25px 0;
+        }
+
+        .result-value {
+            color: #82d13d;
+            font-size: 32px;
+            font-weight: bold;
+            margin: 0;
+        }
+
+        .btn-apply {
+            background: linear-gradient(to right, #82d13d, #95e14a);
+            color: white;
+            border: none;
+            width: 100%;
+            padding: 18px;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .footer {
+            text-align: center;
+            font-size: 11px;
+            color: #ccc;
+            margin: 30px 0;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="app-header">
+    <span>Waafi</span>
+    <span>☰</span>
+</div>
+
+<div class="card">
+    <h2>Hel Amaah Deg Deg ah</h2>
+    <div class="subtext">Ansixid degdeg ah • Qiimo tartan ah • Muddooyin dabacsan</div>
+
+    <div class="slider-section">
+        <div class="slider-header">
+            <span>Qaddarka Amaahda</span>
+            <span id="valAmt" class="green-text">$1,000</span>
+        </div>
+        <input type="range" id="amt" min="100" max="5000" step="100" value="1000">
+        <div class="slider-footer"><span>$100</span><span>$5,000</span></div>
+    </div>
+
+    <div class="slider-section">
+        <div class="slider-header">
+            <span>Muddada Amaahda</span>
+            <span id="valDur" class="green-text">12 bilood</span>
+        </div>
+        <input type="range" id="dur" min="6" max="60" step="6" value="12">
+        <div class="slider-footer"><span>6 bilood</span><span>60 bilood</span></div>
+    </div>
+
+    <div class="result-container">
+        <p style="margin:0; font-size:14px; color:#666">Lacagta Bisha</p>
+        <p id="monthly" class="result-value">$98.33</p>
+    </div>
+
+    <button class="btn-apply" onclick="goToPage2()">CODSO HADDA</button>
+</div>
+
+<div class="footer">© 2025 Waafi Soomaaliya</div>
+
+<script>
+    function update() {
+        const amtEl = document.getElementById('amt');
+        const durEl = document.getElementById('dur');
+
+        if (!amtEl || !durEl) return;
+
+        const amount = Number(amtEl.value) || 0;
+        const duration = Number(durEl.value) || 1;
+
+        document.getElementById('valAmt').innerText = `$${amount.toLocaleString()}`;
+        document.getElementById('valDur').innerText = `${duration} bilood`;
+
+        const monthly = (amount * 1.18) / duration;
+        document.getElementById('monthly').innerText = `$${monthly.toFixed(2)}`;
+    }
+
+    function goToPage2() {
+        const amtEl = document.getElementById('amt');
+        const durEl = document.getElementById('dur');
+
+        if (!amtEl || !durEl) return;
+
+        localStorage.setItem('amount', amtEl.value);
+        localStorage.setItem('loanDuration', durEl.value + " Bilood");
+
+        window.location.href = "/page2";
+    }
+
+    window.onload = () => {
+        const tg = window.Telegram?.WebApp;
+
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
+
+        const amtEl = document.getElementById('amt');
+        const durEl = document.getElementById('dur');
+
+        if (amtEl) amtEl.addEventListener('input', update);
+        if (durEl) durEl.addEventListener('input', update);
+
+        update();
+    };
+</script>
+
+</body>
+  </html>
