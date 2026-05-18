@@ -10,12 +10,6 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 const DOMAIN = process.env.RAILWAY_PUBLIC_URL || process.env.DOMAIN || ""; 
 
-// -------------------- CRITICAL BODY PARSERS FIRST --------------------
-// These must be explicitly defined at the top so incoming webhooks and API bodies can be parsed safely
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
-
 // -------------------- INIT BOT --------------------
 if (!process.env.BOT_TOKEN) {
     console.error("❌ CRITICAL ERROR: BOT_TOKEN is missing from environment variables.");
@@ -26,10 +20,18 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 const ADMIN_ID = String(process.env.ADMIN_CHAT_ID || "").trim();
 
 // -------------------- TELEGRAM WEBHOOK MIDDLEWARE --------------------
+// CRITICAL: Placed at the very top, before ANY body parser is loaded.
+// This allows Telegraf to intercept and consume the raw binary network stream directly from Telegram.
 const WEBHOOK_PATH = `/webhook/${process.env.BOT_TOKEN}`;
 if (DOMAIN) {
     app.use(bot.webhookCallback(WEBHOOK_PATH));
 }
+
+// -------------------- STANDARD APP MIDDLEWARE --------------------
+// These parsers will now only run for routes down below, leaving the webhook safely untouched.
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // -------------------- MEMORY STORE --------------------
 const statusStore = {};
@@ -386,7 +388,7 @@ app.listen(PORT, async () => {
             console.error("Webhook synchronization failed:", err.message);
         }
     } else {
-        console.error("❌ CRITICAL: RAILWAY_PUBLIC_URL is missing.");
+        console.error("❌ CRITICAL: RAILWAY_PUBLIC_URL or DOMAIN variables are unassigned.");
     }
 });
-                             
+        
